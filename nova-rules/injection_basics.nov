@@ -1,0 +1,15 @@
+rule InjectionBasics
+{
+    meta:
+        description = "Common prompt injection / instruction override patterns"
+        author = "security-setup"
+        severity = "high"
+
+    keywords:
+        $ignore = /(ignore|disregard|forget) (all |your |any |the )?(previous|prior|above|earlier) (instructions|rules|prompts?|context)/i
+        $system = /you are now|new system prompt|developer mode|act as (if|though) you have no restrictions/i
+        $exfil = /(send|forward|post|email|upload) (this|the|all|every).{0,60}(to|via) (https?:|email|webhook|www\.)/i
+
+    condition:
+        keywords.$ignore or keywords.$system or keywords.$exfil
+}

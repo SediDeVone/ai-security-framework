@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+llm-guard
+presidio-analyzer
+presidio-anonymizer
+nova-hunting
+spacy
+transformers
+torch
+# optional, for AlignmentCheck (/scan/trace); needs LLM backend key:
+# llamafirewall
+# after install:
+#   python -m spacy download en_core_web_lg
+#   huggingface-cli login   (PromptGuard 2 models are license-gated)
