@@ -25,7 +25,17 @@ supply  ─► SessionStart ─────► agent-scan (mcp-scan) + sketchy (
 | Config tampering | sketchy (Adversis) | git post-checkout / CI | scans settings.json, CLAUDE.md, hook defs |
 | Hard limits | Claude Code permissions | `permissions.deny` + managed settings | not bypassable by hooks |
 
-## Install
+## Install & Shortcuts
+
+Using `make`:
+
+```bash
+make install-harness  # Installs hooks, commands, agents, & rules into ~/.claude/
+make docker-up        # Starts containerized scanner service
+make test             # Sanity & health check endpoints
+```
+
+Manual install:
 
 ```bash
 # 1. Scanner service (persistent — run via systemd/launchd or docker)
@@ -47,6 +57,7 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 
 ## Files
 
+- `Makefile` — Shortcuts for installation, Docker management, & sanity testing
 - `harness/settings.json` — hooks wiring + permission deny rules
 - `harness/hooks/guard.py` — single dispatcher (prompt/tool-in/tool-out/Stop trace audit)
 - `harness/hooks/sf_scan.sh` — Salesforce Code Analyzer, scoped to changed files
@@ -54,10 +65,24 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 - `harness/commands/strip-pii.md` — copy to `~/.claude/commands/`
 - `harness/agents/untrusted-reader.md` — copy to `~/.claude/agents/`
 - `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA + PromptGuard 2
+- `scanner/client.py` — Python SDK client for consuming the scanner in standalone agents
 - `scanner/requirements.txt`
 - `scanner/Dockerfile` & `scanner/docker-compose.yml` — Docker container deployment
 - `rules/` — Threat intelligence NOVA rules (.nov)
+- `docs/AI_SECURITY_PILLARS.md` — 6 Pillars of Secure AI Applications (Architecture, Injection, Data/PII, RAG, Agents, Monitoring)
+- `docs/THREAT_MATRIX_MAPPING.md` — Comprehensive threat matrix & defense mapping guide
 - `docs/` — Architecture assessments, split plans, & documentation
+
+## Optional Security Tools & Configurations
+
+| Tool | Purpose | Install / Run Command |
+| :--- | :--- | :--- |
+| **`promptfoo`** | Automated pre-deploy red-teaming & prompt injection probes | `npm install -g promptfoo` $\rightarrow$ `make redteam` |
+| **`Pillow`** | EXIF & GPS metadata stripping from image uploads | `pip install Pillow` |
+| **`slopsquatting_guard`** | PyPI API package existence verification hook | `cp harness/hooks/slopsquatting_guard.py ~/.claude/hooks/` |
+| **`garak`** | NVIDIA LLM vulnerability & red-team scanner | `pip install -U garak` $\rightarrow$ `python -m garak --probes promptinject` |
+| **`gitleaks`** | Git repository credential & secret scanner | `brew install gitleaks` |
+| **`mcp-scan`** | MCP server supply chain & tool poisoning audit | `uvx mcp-scan@latest` |
 
 ## Deliberate choices
 

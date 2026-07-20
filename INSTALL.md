@@ -71,20 +71,33 @@ do not create one unprompted.
    `sf plugins install code-analyzer`.
 3. jq is required by sf_scan.sh: verify `jq --version`.
 
-## Step 5 — smoke tests (run all, show results)
+## Step 5.5 — Optional Tools & Enhancements
 
+### A. Pre-Deploy Red-Teaming (`promptfoo`)
+Runs automated prompt injection & jailbreak probes.
 ```bash
-# hook wiring responds correctly
-echo '{"hook_event_name":"UserPromptSubmit","prompt":"hello"}' \
-  | python3 ~/.claude/hooks/guard.py; echo "exit=$?"          # expect exit=0, no output
+npm install -g promptfoo          # Install CLI
+make redteam                      # Run automated probes against redteam/promptfoo.yaml
+```
 
-# PII redaction path
-echo '{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"x.txt","content":"Call John Smith at john.smith@acme.com about invoice 12345678"}}' \
-  | python3 ~/.claude/hooks/guard.py                          # expect updatedInput with redactions
+### B. Image EXIF Metadata Cleaner (`Pillow`)
+Removes GPS coordinates & camera info from image uploads before LLM processing.
+```bash
+~/.claude/scanner-venv/bin/pip install Pillow
+```
 
-# sf scan ignores non-Salesforce files
-echo '{"hook_event_name":"PostToolUse","tool_name":"Write","tool_input":{"file_path":"/tmp/readme.md"}}' \
-  | bash ~/.claude/hooks/sf_scan.sh; echo "exit=$?"           # expect exit=0, no output
+### C. Slopsquatting Guard Hook
+Prevents installing hallucinated PyPI packages (19.7% of AI code snippets).
+```bash
+cp harness/hooks/slopsquatting_guard.py ~/.claude/hooks/
+chmod +x ~/.claude/hooks/slopsquatting_guard.py
+```
+
+### D. Red-Teaming Scanner (`garak`)
+NVIDIA LLM security probing tool.
+```bash
+pip install -U garak
+python -m garak --target_type openai --target_name gpt-4 --probes promptinject
 ```
 
 ## Step 6 — hand back to the human (YOU CANNOT DO THESE)

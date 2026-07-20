@@ -159,6 +159,8 @@ def redact_pii(text: str) -> tuple[str, bool]:
 
 @app.post("/scan/prompt")
 def scan_prompt(req: PromptReq):
+    if is_killed:
+        return {"block": True, "rule": "EMERGENCY_KILL_SWITCH", "detail": "Emergency lockdown active."}
     rule = nova_match(req.text)
     if rule:
         return {"block": True, "rule": rule, "detail": "NOVA rule match."}
@@ -260,11 +262,24 @@ def scan_tool_output(req: ToolOutputReq):
     return {"block": False, "redacted_text": red if hit else None}
 
 
+is_killed = False
+
+
+@app.post("/kill-switch")
+def toggle_kill_switch(payload: dict):
+    global is_killed
+    state = payload.get("active", True)
+    is_killed = state
+    return {"kill_switch_active": is_killed,
+            "message": "EMERGENCY KILL-SWITCH ACTIVATED" if is_killed else "Kill-switch deactivated"}
+
+
 @app.get("/health")
 def health():
     load_rules_if_needed()
     return {
-        "status": "healthy",
+        "status": "healthy" if not is_killed else "LOCKED_DOWN",
+        "kill_switch_active": is_killed,
         "prompt_guard_active": prompt_guard is not None,
         "alignment_active": alignment_fw is not None,
         "rules_count": len(matchers)
