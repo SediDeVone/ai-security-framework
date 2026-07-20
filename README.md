@@ -38,33 +38,26 @@ pipx install sketchy-scan                    # Adversis sketchy (check repo for 
 brew install gitleaks
 
 # 3. Copy hooks + settings
-cp -r hooks ~/.claude/hooks
+cp -r harness/hooks ~/.claude/hooks
 cp -r rules ~/.claude/nova-rules
-# merge settings.json into ~/.claude/settings.json
+cp harness/commands/strip-pii.md ~/.claude/commands/
+cp harness/agents/untrusted-reader.md ~/.claude/agents/
+# merge harness/settings.json into ~/.claude/settings.json
 ```
 
 ## Files
 
-- `settings.json` — hooks wiring + permission deny rules
-- `hooks/guard.py` — single dispatcher (prompt/tool-in/tool-out/Stop trace audit)
-- `hooks/sf_scan.sh` — Salesforce Code Analyzer, scoped to the ONE changed
-  file, PMD security rules only (SFGE stays in CI — see code-analyzer.yml)
-- `hooks/redact_cli.py` — CLI behind the /strip-pii command
-- `commands/strip-pii.md` — copy to `~/.claude/commands/`. Explicit local
-  redaction: `/strip-pii <text or file path>`. The `!`-bash runs client-side
-  BEFORE the prompt is sent, so only Presidio's output enters model context.
-  Verify once on your version by checking the transcript for raw text.
-- `agents/untrusted-reader.md` — copy to `~/.claude/agents/`. Read-only
-  subagent for JIRA/Confluence/email/web content: injections that fire in it
-  have no write/Bash/outbound tools to abuse. Adjust the MCP tool names in
-  its frontmatter to match your connectors.
-- `scanner/scanner_service.py` — FastAPI service: Presidio (with custom Polish PESEL/NIP recognizers) + NOVA (with dynamic hot-reloading) + PromptGuard 2 (injection scoring) + optional AlignmentCheck (trace audit)
+- `harness/settings.json` — hooks wiring + permission deny rules
+- `harness/hooks/guard.py` — single dispatcher (prompt/tool-in/tool-out/Stop trace audit)
+- `harness/hooks/sf_scan.sh` — Salesforce Code Analyzer, scoped to changed files
+- `harness/hooks/redact_cli.py` — CLI behind the /strip-pii command
+- `harness/commands/strip-pii.md` — copy to `~/.claude/commands/`
+- `harness/agents/untrusted-reader.md` — copy to `~/.claude/agents/`
+- `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA + PromptGuard 2
 - `scanner/requirements.txt`
-- `rules/injection_basics.nov` — starter NOVA rule (extend via PromptIntel /
-  `threatfeeds-to-nova`)
-- `code-analyzer.yml` — Code Analyzer v5 config; per-file PMD in hooks,
-  full SFGE data-flow scan in CI only (it cannot be scoped to changed files)
-- `docs/security_assessment_and_plan.md` — Security assessment, validation notes, and standalone agent architecture plan.
+- `scanner/Dockerfile` & `scanner/docker-compose.yml` — Docker container deployment
+- `rules/` — Threat intelligence NOVA rules (.nov)
+- `docs/` — Architecture assessments, split plans, & documentation
 
 ## Deliberate choices
 

@@ -23,11 +23,10 @@ From this folder:
 
 ```bash
 mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents
-cp hooks/*.py hooks/*.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/*
+cp harness/hooks/*.py harness/hooks/*.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/*
 cp rules/*.nov ~/.claude/nova-rules/
-cp commands/strip-pii.md ~/.claude/commands/
-cp agents/untrusted-reader.md ~/.claude/agents/
-cp code-analyzer.yml <salesforce-project-root>/code-analyzer.yml  # skip if one exists
+cp harness/commands/strip-pii.md ~/.claude/commands/
+cp harness/agents/untrusted-reader.md ~/.claude/agents/
 ```
 
 ## Step 2 — MERGE settings.json (never overwrite)
