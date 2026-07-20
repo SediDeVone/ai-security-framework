@@ -64,11 +64,14 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 - `harness/hooks/redact_cli.py` — CLI behind the /strip-pii command
 - `harness/commands/strip-pii.md` — copy to `~/.claude/commands/`
 - `harness/agents/untrusted-reader.md` — copy to `~/.claude/agents/`
-- `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA + PromptGuard 2
+- `harness/hooks/skill_integrity_check.py` — SHA256 instruction & skill file integrity checker
+- `scanner/adk_middleware.py` — Universal ADK/SDK security interceptor for custom Python agents (Google Gen AI ADK, LangChain, CrewAI)
+- `scanner/budget_guard.py` — Token quota, step limit, & budget cap manager against Denial of Wallet
 - `scanner/client.py` — Python SDK client for consuming the scanner in standalone agents
-- `scanner/requirements.txt`
+- `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA + PromptGuard 2
 - `scanner/Dockerfile` & `scanner/docker-compose.yml` — Docker container deployment
 - `rules/` — Threat intelligence NOVA rules (.nov)
+- `docs/ADK_HARNESS_SECURITY_GUIDE.md` — Dual security guide for CLI harnesses & custom ADK/SDK agents
 - `docs/AI_SECURITY_PILLARS.md` — 6 Pillars of Secure AI Applications (Architecture, Injection, Data/PII, RAG, Agents, Monitoring)
 - `docs/THREAT_MATRIX_MAPPING.md` — Comprehensive threat matrix & defense mapping guide
 - `docs/` — Architecture assessments, split plans, & documentation
