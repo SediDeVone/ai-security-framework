@@ -46,9 +46,11 @@ def out(obj: dict):
 def handle_prompt(data: dict):
     try:
         res = call_scanner("scan/prompt", {"text": data.get("prompt", "")})
-    except Exception as e:  # fail-open: don't brick the session
+    except Exception as e:  # fail-open: don't brick the session, but alert the user
         log(f"scanner unreachable on UserPromptSubmit: {e}")
-        sys.exit(0)
+        out({"hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": "[security-warning] ⚠️ Security scanner service is OFFLINE! Prompt and output screening are currently inactive."}})
     if res.get("block"):
         out({"decision": "block",
              "reason": f"Blocked by security policy: {res['rule']}. "

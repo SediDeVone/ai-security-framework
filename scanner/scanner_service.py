@@ -16,12 +16,38 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 # --- engines (loaded once, warm) -------------------------------------------
-from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_anonymizer import AnonymizerEngine
 from llm_guard.input_scanners import Secrets, InvisibleText
 from nova.core import NovaRuleFileParser, NovaMatcher  # nova-hunting
 
+# Custom Polish Recognizers for regional PII compliance
+pesel_pattern = Pattern(
+    name="pesel_pattern",
+    regex=r"\b\d{11}\b",
+    score=0.85
+)
+pesel_recognizer = PatternRecognizer(
+    supported_entity="PL_PESEL",
+    patterns=[pesel_pattern],
+    context=["pesel", "identification number", "national id", "personal number"]
+)
+
+nip_pattern = Pattern(
+    name="nip_pattern",
+    regex=r"\b\d{3}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}\b|\b\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?\d{3}\b",
+    score=0.85
+)
+nip_recognizer = PatternRecognizer(
+    supported_entity="PL_NIP",
+    patterns=[nip_pattern],
+    context=["nip", "tax identification number", "vat", "tax id"]
+)
+
 analyzer = AnalyzerEngine()
+analyzer.registry.add_recognizer(pesel_recognizer)
+analyzer.registry.add_recognizer(nip_recognizer)
+
 anonymizer = AnonymizerEngine()
 secrets_scanner = Secrets()
 invisible_scanner = InvisibleText()
@@ -66,12 +92,36 @@ def injection_score(text: str) -> float:
 
 RULES_DIR = os.path.expanduser("~/.claude/nova-rules")
 parser = NovaRuleFileParser()
-matchers = [NovaMatcher(r)
-            for f in glob.glob(f"{RULES_DIR}/*.nov")
-            for r in parser.parse_file(f)]
+matchers = []
+last_rules_loaded = 0.0
+
+def load_rules_if_needed():
+    global matchers, last_rules_loaded
+    if not os.path.exists(RULES_DIR):
+        return
+    
+    mtimes = [os.path.getmtime(RULES_DIR)]
+    nov_files = glob.glob(f"{RULES_DIR}/*.nov")
+    for f in nov_files:
+        try:
+            mtimes.append(os.path.getmtime(f))
+        except OSError:
+            pass
+            
+    max_mtime = max(mtimes) if mtimes else 0.0
+    if max_mtime > last_rules_loaded:
+        new_matchers = []
+        for f in nov_files:
+            try:
+                for r in parser.parse_file(f):
+                    new_matchers.append(NovaMatcher(r))
+            except Exception as e:
+                print(f"[scanner] Error loading rule file {f}: {e}")
+        matchers = new_matchers
+        last_rules_loaded = max_mtime
 
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE",
-                "PERSON", "US_SSN"]
+                "PERSON", "US_SSN", "PL_PESEL", "PL_NIP"]
 
 app = FastAPI()
 
@@ -92,6 +142,7 @@ class ToolOutputReq(BaseModel):
 
 
 def nova_match(text: str):
+    load_rules_if_needed()
     for m in matchers:
         result = m.check_prompt(text)
         if result.get("matched"):
@@ -207,6 +258,17 @@ def scan_tool_output(req: ToolOutputReq):
         return {"block": False, "redacted_text": cleaned}
     red, hit = redact_pii(req.text)
     return {"block": False, "redacted_text": red if hit else None}
+
+
+@app.get("/health")
+def health():
+    load_rules_if_needed()
+    return {
+        "status": "healthy",
+        "prompt_guard_active": prompt_guard is not None,
+        "alignment_active": alignment_fw is not None,
+        "rules_count": len(matchers)
+    }
 
 
 if __name__ == "__main__":
