@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  scanner:
+    build: .
+    image: ai-security-scanner:latest
+    container_name: ai-security-scanner
+    ports:
+      - "8901:8901"
+    environment:
+      - PROMPT_GUARD_MODEL=meta-llama/Llama-Prompt-Guard-2-22M
+      - STRICT_PII=0
+      # Provide HF token if downloading license-gated models, or mount the cache below
+      - HF_TOKEN=
+    volumes:
+      # Mount rules directory so the service can read and reload them
+      - ./rules:/root/.claude/nova-rules
+      # Mount cache directory so models are not redownloaded on container restart
+      - hf_cache:/root/.cache/huggingface
+
+volumes:
+  hf_cache:
