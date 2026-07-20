@@ -97,7 +97,6 @@ Report completion and tell the human to:
 2. Run `/hooks` to confirm the entries appear.
 3. Test `/strip-pii John Smith, john@acme.com, +48 601 234 567` and confirm
    the transcript shows only redacted text.
-4. Note: default Presidio misses Polish identifiers (PESEL/NIP) — custom
-   recognizers needed if org data includes them.
+4. Note: Custom recognizers are pre-configured in the scanner service for Polish identifiers (PESEL/NIP).
 5. Manually review every file you changed, especially settings.json —
    the human is the verification layer for this install, not you.

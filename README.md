@@ -58,13 +58,13 @@ cp -r rules ~/.claude/nova-rules
   subagent for JIRA/Confluence/email/web content: injections that fire in it
   have no write/Bash/outbound tools to abuse. Adjust the MCP tool names in
   its frontmatter to match your connectors.
-- `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA +
-  PromptGuard 2 (injection scoring) + optional AlignmentCheck (trace audit)
+- `scanner/scanner_service.py` — FastAPI service: Presidio (with custom Polish PESEL/NIP recognizers) + NOVA (with dynamic hot-reloading) + PromptGuard 2 (injection scoring) + optional AlignmentCheck (trace audit)
 - `scanner/requirements.txt`
 - `rules/injection_basics.nov` — starter NOVA rule (extend via PromptIntel /
   `threatfeeds-to-nova`)
 - `code-analyzer.yml` — Code Analyzer v5 config; per-file PMD in hooks,
   full SFGE data-flow scan in CI only (it cannot be scoped to changed files)
+- `docs/security_assessment_and_plan.md` — Security assessment, validation notes, and standalone agent architecture plan.
 
 ## Deliberate choices
 
@@ -80,6 +80,8 @@ cp -r rules ~/.claude/nova-rules
    `permissions.deny` and managed settings are enforced by Claude Code itself.
    Keep `curl|sh`, `.env` reads, and unpinned MCP installs in deny rules,
    not just hook logic.
+5. **Dynamic Rule Reloading** — Rule updates in the rules directory are hot-loaded by the scanner service on the next request, eliminating manual restarts of the daemon.
+6. **Regional PII Support** — Configured custom Presidio recognizers for Polish PESEL and NIP numbers, expanding out-of-the-box GDPR compliance.
 
 ## Not included, worth considering
 
