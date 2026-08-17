@@ -100,24 +100,21 @@ ai-security-framework/
 
 ---
 
-## 3. Recommended Roadmap & Next Steps
+## 3. Remaining Roadmap & Next Steps
 
 ```mermaid
 gantt
-    title Refactoring Execution Timeline
+    title Refactoring Execution Roadmap
     dateFormat  YYYY-MM-DD
-    section Phase 1: Logical Reorganization
-    Move files to harness/ & scanner/ directories :done, p1, 2026-07-20, 1d
-    Update paths in INSTALL.md & README.md        :p2, after p1, 1d
-    section Phase 2: Decoupled Deployments
-    Test standalone Docker build on Synology       :p3, after p2, 2d
-    Add configurable SCANNER_URL in guard.py      :p4, after p3, 1d
-    section Phase 3: Physical Split (Optional)
+    section Decoupled Deployments
+    Test standalone Docker build on Synology       :p3, 2026-07-21, 2d
+    Add configurable SCANNER_URL in guard.py      :done, p4, 2026-07-23, 1d
+    section Physical Split (Optional)
     Split into 2 repos if multi-client adoption grows :p5, 2026-07-25, 3d
 ```
 
-### Recommendation:
-Start with **Strategy A (Monorepo with `harness/` and `scanner/` subdirectories)** immediately within this repository. This provides 90% of the architectural clarity with zero multi-repo overhead. If the standalone scanner is adopted by other teams or projects later, execute **Strategy B** to extract `scanner/` into its own repository.
+### Current Status:
+The repository has been successfully reorganized according to **Strategy A (Monorepo with `harness/` and `scanner/` subdirectories)**. This provides architectural clarity while keeping maintenance simple. If the standalone scanner is adopted by other teams or projects later, execute **Strategy B** to extract `scanner/` into its own repository.
 
 ---
 

@@ -31,28 +31,24 @@ graph TD
 
 ### Key Strengths of Current Design
 1. **Persistent Warm Scanner (Performance)**: Resolves the multi-second startup delay of loading SpaCy models and Hugging Face pipelines on every CLI invocation.
-2. **Asymmetric Fail-Safes**:
+2. **Dynamic Rule Reloading**: Rule updates in the rules directory are hot-loaded by the scanner service on the next request, eliminating manual restarts.
+3. **Regional PII Support**: Built-in recognizers for Polish PESEL and NIP numbers for GDPR compliance.
+4. **Structured JSON Auditing**: Hook events and scanner decisions are logged to `~/.claude/security_audit.jsonl` for SIEM integration and forensic analysis.
+5. **MCP Server Sandboxing**: Hook dispatcher supports an `ALLOWED_MCP_SERVERS` allowlist to block unvetted MCP servers.
+6. **Automated Rule Feeds**: Included `update_rules.sh` script automates pulling latest NOVA threat patterns.
+7. **Configurable Connectivity**: The scanner URL is configurable via environment variables, allowing for remote or containerized scanner deployments.
+8. **Asymmetric Fail-Safes**:
    - *Fail-open* on `UserPromptSubmit` to prevent blocking the developer session if the scanner crashes.
    - *Fail-closed* on `PreToolUse` for outbound tool calls (`mcp__` and `Bash`), minimizing data egress risk.
-3. **Multi-Engine Strategy**: Combines pattern-matching (NOVA), heuristics (LLM Guard), ML classification (PromptGuard 2), and PII anonymization (Presidio).
-4. **Out-of-Band Hard Hardening**: Uses Claude Code’s native `permissions.deny` blocklist to restrict critical commands (e.g. piping curl to bash, accessing SSH/AWS directories), which is non-bypassable by hooks.
+9. **Multi-Engine Strategy**: Combines pattern-matching (NOVA), heuristics (LLM Guard), ML classification (PromptGuard 2), and PII anonymization (Presidio).
+10. **Out-of-Band Hard Hardening**: Uses Claude Code’s native `permissions.deny` blocklist to restrict critical commands (e.g. piping curl to bash, accessing SSH/AWS directories), which is non-bypassable by hooks.
 
 ### Identified Gaps & Recommendations
 
-> [!WARNING]
-> **1. Lack of Dynamic Rule Reloading** (Fixed in Repo!)
-> The scanner service loads NOVA rules from `~/.claude/nova-rules/*.nov` only at startup. If rule files are updated, the daemon must be restarted manually.
-> *Recommendation*: Implement a file watcher or dynamic modification time check in `scanner_service.py` to hot-reload rule objects.
-
-> [!IMPORTANT]
-> **2. Presidio Polish/Regional Restrictions** (Fixed in Repo!)
-> By default, Presidio lacks recognizers for Polish-specific data formats (like NIP, PESEL, Polish ID cards, or local phone formats).
-> *Recommendation*: Add a custom `PatternRecognizer` dictionary to the AnalyzerEngine initialization in `scanner_service.py`.
-
 > [!NOTE]
-> **3. PromptGuard 2 Gating & Authentication**
+> **1. PromptGuard 2 Gating & Authentication**
 > Meta's `Llama-Prompt-Guard-2-22M` model requires Hugging Face credentials and accepting a user license. Without it, the prompt-injection scoring silently disables.
-> *Recommendation*: Add a clear diagnostic endpoint or CLI output notifying the user if PromptGuard is inactive.
+> *Recommendation*: Add a clear diagnostic endpoint or CLI output notifying the user if PromptGuard is inactive. (Status: Partial — /health endpoint provides status).
 
 ---
 
@@ -62,10 +58,8 @@ Here is a concrete plan to augment the current harness:
 
 | Target Component | Proposed Security Feature | Rationale |
 | :--- | :--- | :--- |
-| **PII Scanners** | Custom Polish Recognizers (PESEL/NIP) (Completed) | Ensures local compliance under GDPR for organizations handling EU/Polish data. |
-| **Observability** | Structured Hook Auditing & Alerts | Move from `/tmp` logs to structured JSON lines (`~/.claude/security_audit.jsonl`) with levels (`INFO`, `WARN`, `ALERT`) for SIEM consumption. |
-| **Rule Feeds** | Automate NOVA rules updates | Integrate a shell script or cron task utilizing `threatfeeds-to-nova` to pull active jailbreaks and injection patterns weekly. |
-| **MCP Hardening** | MCP Server Permissions Sandboxing | Block unvetted MCP servers using a strict `allowedMcpServers` array in the managed settings configuration. |
+| **Observability** | SIEM Integration | Export structured JSON logs to external logging providers (e.g. Datadog, Splunk) for real-time alerting. |
+| **MCP Hardening** | MCP Server Permissions Sandboxing (Extended) | Implement granular per-tool permissioning within authorized MCP servers. |
 
 ---
 
@@ -149,18 +143,17 @@ For standalone agents, you should combine the following frameworks depending on 
 
 ---
 
-## 5. Implementation Action Plan
+## 5. Remaining Implementation Tasks
 
 ```mermaid
 gantt
-    title Agent Security Implementation Timeline
+    title Agent Security Implementation Roadmap
     dateFormat  YYYY-MM-DD
     section Claude Code Enhancements
-    File watcher implementation     :done, a1, 2026-07-17, 1d
-    Polish custom PII recognizers  :done, a2, 2026-07-17, 1d
-    NOVA feed auto-updater         :a3, after a2, 1d
+    NOVA feed auto-updater         :done, a3, 2026-07-18, 1d
+    Structured Hook Auditing       :done, a4, 2026-07-18, 1d
+    MCP Server Sandboxing          :done, a5, 2026-07-18, 1d
     section Standalone Gateway
-    Define FastAPI Security Proxy  :b1, 2026-07-20, 3d
-    Presidio Rehydration Middleware:b2, after b1, 2d
+    Presidio Rehydration Middleware:done, b2, 2026-07-23, 2d
     Sandboxed Tool Execution (E2B) :b3, after b2, 3d
 ```
