@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aisecurity.scanner</string>
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Replace 'your_username' with your actual macOS username -->
+        <string>/Users/your_username/.claude/scanner-venv/bin/python</string>
+        <string>/Users/your_username/.claude/hooks/scanner_service.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/ai_security_scanner.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/ai_security_scanner.err</string>
+    <!-- Optional environment variables -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SCANNER_API_KEY</key>
+        <string>your-secure-api-key</string>
+    </dict>
+    -->
+</dict>
+</plist>

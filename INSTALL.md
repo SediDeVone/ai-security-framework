@@ -45,13 +45,26 @@ python3 -m venv ~/.claude/scanner-venv
 cp scanner/scanner_service.py ~/.claude/hooks/
 ```
 
-Start it and verify:
+### Autostart & Service Configuration (Recommended)
+You can run the scanner service as a persistent background daemon:
+- **macOS**: Edit and copy [com.aisecurity.scanner.plist](file:///Users/sebastianlasisz/workspace/repositories/ai_tools/ai-security-framework/scanner/com.aisecurity.scanner.plist) to `~/Library/LaunchAgents/` and load it:
+  `launchctl load ~/Library/LaunchAgents/com.aisecurity.scanner.plist`
+- **Linux**: Edit and copy [scanner.service](file:///Users/sebastianlasisz/workspace/repositories/ai_tools/ai-security-framework/scanner/scanner.service) to `/etc/systemd/system/` (or `~/.config/systemd/user/`) and enable it:
+  `systemctl enable --now scanner.service`
+
+### API Security (Recommended for Production)
+To prevent unauthorized users on the network from accessing your sandbox or disabling your hooks, set the `SCANNER_API_KEY` environment variable in your service environment (e.g. plist or systemd file) and in your client shell. The scanner clients ([guard.py](file:///Users/sebastianlasisz/workspace/repositories/ai_tools/ai-security-framework/harness/hooks/guard.py) and [redact_cli.py](file:///Users/sebastianlasisz/workspace/repositories/ai_tools/ai-security-framework/harness/hooks/redact_cli.py)) will automatically pick it up and pass the key via `X-API-Key`.
+
+Start manually and verify:
 
 ```bash
+# Secure start example
+export SCANNER_API_KEY="my-secret-key"
 nohup ~/.claude/scanner-venv/bin/python ~/.claude/hooks/scanner_service.py \
   > /tmp/scanner.log 2>&1 &
 sleep 20 && curl -s -X POST http://127.0.0.1:8901/redact \
   -H 'Content-Type: application/json' \
+  -H 'X-API-Key: my-secret-key' \
   -d '{"text":"Contact John Smith at john@acme.com"}'
 ```
 

@@ -1,0 +1,18 @@
+[Unit]
+Description=AI Security Scanner Service
+After=network.target
+
+[Service]
+Type=simple
+# Replace 'username' with your actual username or run as a user service
+User=username
+WorkingDirectory=/home/username/.claude
+Environment="SCANNER_URL=http://127.0.0.1:8901"
+# Optional: Set this to secure your scanner service with an API Key
+# Environment="SCANNER_API_KEY=your-secure-api-key"
+ExecStart=/home/username/.claude/scanner-venv/bin/python /home/username/.claude/hooks/scanner_service.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
