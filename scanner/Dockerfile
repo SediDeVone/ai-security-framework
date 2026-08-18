@@ -15,12 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Download spacy model
 RUN python -m spacy download en_core_web_lg
 
-# Copy scanner service
-COPY scanner/scanner_service.py ./scanner_service.py
+# Copy scanner modules
+COPY scanner/ /app/scanner/
 
-# Create rules directory path
-RUN mkdir -p /root/.claude/nova-rules
-
+# Expose the service
 EXPOSE 8901
 
-CMD ["python", "scanner_service.py"]
+CMD ["python", "scanner/scanner_service.py"]

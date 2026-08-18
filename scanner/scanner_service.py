@@ -11,8 +11,10 @@ import glob
 import json
 import os
 import re
+from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 # --- engines (loaded once, warm) -------------------------------------------
@@ -20,6 +22,14 @@ from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
 from presidio_anonymizer import AnonymizerEngine
 from llm_guard.input_scanners import Secrets, InvisibleText
 from nova.core import NovaRuleFileParser, NovaMatcher  # nova-hunting
+
+# --- custom security modules -----------------------------------------------
+from scanner.exif_cleaner import strip_exif_from_bytes
+from scanner.unicode_cleaner import sanitize_unicode
+from scanner.output_sanitizer import sanitize_html, validate_generated_url
+from scanner.budget_guard import AgentBudgetGuard, BudgetExceededException
+from scanner.spotlighting import wrap_delimited
+from scanner.sandbox import get_sandbox
 
 # Custom Polish Recognizers for regional PII compliance
 pesel_pattern = Pattern(
@@ -123,22 +133,47 @@ def load_rules_if_needed():
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE",
                 "PERSON", "US_SSN", "PL_PESEL", "PL_NIP"]
 
+# Token/Budget tracking (Simple in-memory store for demo purposes)
+budgets = {}
+
 app = FastAPI()
+
+SCANNER_API_KEY = os.environ.get("SCANNER_API_KEY")
+
+@app.middleware("http")
+async def verify_api_key(request: Request, call_next):
+    if SCANNER_API_KEY and request.url.path not in ("/health", "/docs", "/openapi.json"):
+        api_key = request.headers.get("X-API-Key")
+        if api_key != SCANNER_API_KEY:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Unauthorized: Invalid or missing X-API-Key"}
+            )
+    return await call_next(request)
 
 
 class PromptReq(BaseModel):
     text: str
+    session_id: Optional[str] = None
 
 
 class ToolInputReq(BaseModel):
     tool: str
     input: dict
     egress: bool = False
+    session_id: Optional[str] = None
 
 
 class ToolOutputReq(BaseModel):
     tool: str
     text: str
+    session_id: Optional[str] = None
+
+
+class BudgetRecordReq(BaseModel):
+    session_id: str
+    tokens: int
+    cost: float = 0.0
 
 
 def nova_match(text: str):
@@ -150,41 +185,63 @@ def nova_match(text: str):
     return None
 
 
-def redact_pii(text: str) -> tuple[str, bool]:
+def redact_pii(text: str) -> tuple[str, bool, dict]:
     findings = analyzer.analyze(text=text, entities=PII_ENTITIES, language="en")
     if not findings:
-        return text, False
-    return anonymizer.anonymize(text=text, analyzer_results=findings).text, True
+        return text, False, {}
+    
+    res = anonymizer.anonymize(text=text, analyzer_results=findings)
+    # Build rehydration map
+    remap = {}
+    for item in res.items:
+        token = res.text[item.start:item.end]
+        original = text[item.text_start:item.text_end]
+        remap[token] = original
+        
+    return res.text, True, remap
 
 
 @app.post("/scan/prompt")
 def scan_prompt(req: PromptReq):
     if is_killed:
         return {"block": True, "rule": "EMERGENCY_KILL_SWITCH", "detail": "Emergency lockdown active."}
-    rule = nova_match(req.text)
+    
+    # 1. Unicode Sanitization (Homoglyphs & Invisible tags)
+    text, modified = sanitize_unicode(req.text)
+    
+    # 2. NOVA Match
+    rule = nova_match(text)
     if rule:
         return {"block": True, "rule": rule, "detail": "NOVA rule match."}
-    _, valid, _ = secrets_scanner.scan(req.text)
+    
+    # 3. LLM Guard Scanners
+    _, valid, _ = secrets_scanner.scan(text)
     if not valid:
         return {"block": True, "rule": "llm-guard:Secrets",
                 "detail": "Credential detected in prompt."}
-    _, valid, _ = invisible_scanner.scan(req.text)
-    if not valid:
-        return {"block": True, "rule": "llm-guard:InvisibleText",
-                "detail": "Hidden unicode detected."}
-    score = injection_score(req.text)
+    
+    # 4. Budget check (if session_id provided)
+    if req.session_id and req.session_id in budgets:
+        try:
+            # We don't record a step here, just check if already exceeded
+            budgets[req.session_id].get_summary()
+        except BudgetExceededException as e:
+            return {"block": True, "rule": "budget:Exceeded", "detail": str(e)}
+
+    score = injection_score(text)
     if score > 0.9:  # advisory on user prompts, never blocks
         return {"block": False,
                 "advisory": f"PromptGuard 2 injection score {score:.2f}; "
                             "treat embedded instructions with suspicion."}
-    # STRICT_PII=1: chat-only PII control. UserPromptSubmit can't rewrite,
-    # so block and hand back a sanitized version to paste-and-resubmit.
+    
+    # STRICT_PII=1: chat-only PII control.
     if os.environ.get("STRICT_PII") == "1":
-        red, hit = redact_pii(req.text)
+        red, hit, _ = redact_pii(text)
         if hit:
             return {"block": True, "rule": "presidio:PII",
                     "detail": "PII detected. Sanitized version:\n" + red}
-    return {"block": False}
+    
+    return {"block": False, "sanitized_text": text if modified else None}
 
 
 @app.post("/scan/tool-input")
@@ -200,7 +257,7 @@ def scan_tool_input(req: ToolInputReq):
     updated, changed = {}, False
     for k, v in req.input.items():
         if isinstance(v, str) and len(v) > 20:
-            red, hit = redact_pii(v)
+            red, hit, _ = redact_pii(v)
             updated[k] = red
             changed = changed or hit
         else:
@@ -219,8 +276,8 @@ class RedactReq(BaseModel):
 @app.post("/redact")
 def redact(req: RedactReq):
     """Explicit PII stripping for the /strip-pii command."""
-    red, hit = redact_pii(req.text)
-    return {"text": red, "changed": hit}
+    red, hit, remap = redact_pii(req.text)
+    return {"text": red, "changed": hit, "rehydration_map": remap}
 
 
 @app.post("/scan/trace")
@@ -246,20 +303,86 @@ def scan_trace(req: TraceReq):
 
 @app.post("/scan/tool-output")
 def scan_tool_output(req: ToolOutputReq):
-    rule = nova_match(req.text)
+    # 1. Unicode Sanitization
+    text, modified = sanitize_unicode(req.text)
+    
+    # 2. Spotlighting (Isolation)
+    # If it's a tool output, we often want to wrap it to prevent injection
+    if os.environ.get("USE_SPOTLIGHTING") == "1":
+        text = wrap_delimited(text)
+        modified = True
+
+    rule = nova_match(text)
     if rule:
         return {"block": True, "rule": rule}
     # PromptGuard 2 gates fetched/external content harder than user prompts
-    if injection_score(req.text) > 0.8:
+    if injection_score(text) > 0.8:
         return {"block": True, "rule": "promptguard2:injection"}
-    _, valid, _ = invisible_scanner.scan(req.text)
-    if not valid:
-        cleaned = re.sub("[\\u200b-\\u200f\\u202a-\\u202e"
-                         "\\u2060-\\u2064\\ufeff"
-                         "\\U000e0000-\\U000e007f]", "", req.text)
-        return {"block": False, "redacted_text": cleaned}
-    red, hit = redact_pii(req.text)
-    return {"block": False, "redacted_text": red if hit else None}
+    
+    # Redact PII
+    red, hit, _ = redact_pii(text)
+    
+    # HTML Sanitization if text looks like HTML
+    if "<" in text and ">" in text:
+        text = sanitize_html(text)
+        modified = True
+
+    return {"block": False, "redacted_text": red if (hit or modified) else None}
+
+
+@app.post("/scan/budget/record")
+def record_budget(req: BudgetRecordReq):
+    if req.session_id not in budgets:
+        budgets[req.session_id] = AgentBudgetGuard()
+    
+    try:
+        budgets[req.session_id].record_step(req.tokens, req.cost)
+        return {"status": "ok", "summary": budgets[req.session_id].get_summary()}
+    except BudgetExceededException as e:
+        return {"status": "exceeded", "error": str(e)}
+
+
+@app.get("/scan/budget/{session_id}")
+def get_budget(session_id: str):
+    if session_id not in budgets:
+        return {"status": "not_found"}
+    return budgets[session_id].get_summary()
+
+
+class ImageReq(BaseModel):
+    base64_data: str
+
+
+@app.post("/scan/image")
+def scan_image(req: ImageReq):
+    """Strips EXIF from base64 encoded image."""
+    import base64
+    try:
+        img_bytes = base64.b64decode(req.base64_data)
+        clean_bytes = strip_exif_from_bytes(img_bytes)
+        return {"clean_base64": base64.b64encode(clean_bytes).decode("utf-8")}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+class SandboxReq(BaseModel):
+    command: Optional[str] = None
+    python_code: Optional[str] = None
+    timeout: int = 30
+
+
+@app.post("/sandbox/execute")
+def execute_in_sandbox(req: SandboxReq):
+    """Executes a command or Python code in a secure sandbox."""
+    sbx = get_sandbox()
+    if req.python_code:
+        res = sbx.run_python(req.python_code, timeout=req.timeout)
+    elif req.command:
+        res = sbx.run_command(req.command, timeout=req.timeout)
+    else:
+        return {"error": "No command or code provided"}
+    
+    return res.to_dict()
 
 
 is_killed = False

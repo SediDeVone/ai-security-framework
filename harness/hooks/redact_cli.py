@@ -18,9 +18,13 @@ SCANNER = "http://127.0.0.1:8901/redact"
 
 def redact(text: str) -> str:
     try:
+        headers = {"Content-Type": "application/json"}
+        api_key = os.environ.get("SCANNER_API_KEY")
+        if api_key:
+            headers["X-API-Key"] = api_key
         req = urllib.request.Request(
             SCANNER, data=json.dumps({"text": text}).encode(),
-            headers={"Content-Type": "application/json"})
+            headers=headers)
         with urllib.request.urlopen(req, timeout=15) as r:
             return json.loads(r.read())["text"]
     except Exception:

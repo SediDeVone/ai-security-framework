@@ -10,6 +10,8 @@ services:
     environment:
       - PROMPT_GUARD_MODEL=meta-llama/Llama-Prompt-Guard-2-22M
       - STRICT_PII=0
+      # Set this to secure your scanner service (clients must pass it via X-API-Key header)
+      - SCANNER_API_KEY=
       # Provide HF token if downloading license-gated models, or mount the cache below
       - HF_TOKEN=
     volumes:

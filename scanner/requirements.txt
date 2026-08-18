@@ -7,6 +7,7 @@ nova-hunting
 spacy
 transformers
 torch
+Pillow
 # optional, for AlignmentCheck (/scan/trace); needs LLM backend key:
 # llamafirewall
 # after install:
