@@ -40,14 +40,19 @@ def check_instruction_files(workspace_dir: str, lock_hashes: Dict[str, str] = No
 
 
 def main():
-    try:
-        data = json.load(sys.stdin)
-    except Exception:
-        sys.exit(0)
-
     # SessionStart check
     workspace = os.getcwd()
-    alerts = check_instruction_files(workspace)
+    
+    lock_file = os.path.expanduser("~/.claude/skill_locks.json")
+    lock_hashes = {}
+    if os.path.exists(lock_file):
+        try:
+            with open(lock_file, "r") as f:
+                lock_hashes = json.load(f)
+        except Exception:
+            pass
+            
+    alerts = check_instruction_files(workspace, lock_hashes)
     if alerts:
         for alert in alerts:
             print(f"[security-alert] {alert}", file=sys.stderr)

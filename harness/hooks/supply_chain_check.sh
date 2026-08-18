@@ -25,6 +25,9 @@ touch "$STAMP"
     sketchy scan ~/.claude "$PWD/.claude" "$PWD/CLAUDE.md" 2>&1 | tail -30
   fi
 
+  # Local instruction & skill integrity check
+  python3 ~/.claude/hooks/skill_integrity_check.py 2>&1 | tail -20
+
   # Secrets already sitting in the repo
   if command -v gitleaks >/dev/null && [ -d "$PWD/.git" ]; then
     gitleaks detect --source "$PWD" --no-banner --exit-code 0 2>&1 | tail -20

@@ -1,4 +1,4 @@
-.PHONY: help install-harness start-scanner docker-up docker-down test
+.PHONY: help install-harness start-scanner docker-up docker-down test update-rules update-locks
 
 help:
 	@echo "AI Security Framework Commands:"
@@ -7,6 +7,8 @@ help:
 	@echo "  make docker-up        - Start scanner service via Docker Compose"
 	@echo "  make docker-down      - Stop scanner Docker container"
 	@echo "  make test             - Run sanity & health checks against scanner"
+	@echo "  make update-rules     - Pull latest NOVA threat feeds"
+	@echo "  make update-locks     - Compute and lock SHA256 hashes of instruction files"
 
 install-harness:
 	@mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents
@@ -14,7 +16,11 @@ install-harness:
 	@cp rules/*.nov ~/.claude/nova-rules/
 	@cp harness/commands/strip-pii.md ~/.claude/commands/
 	@cp harness/agents/untrusted-reader.md ~/.claude/agents/
+	@chmod +x scanner/update_rules.sh
 	@echo "Harness installed! Remember to merge harness/settings.json into ~/.claude/settings.json."
+
+update-rules:
+	@./scanner/update_rules.sh --force
 
 start-scanner:
 	python3 scanner/scanner_service.py
@@ -42,3 +48,6 @@ kill-switch-off:
 redteam:
 	@echo "Running pre-deploy red-teaming evaluation via promptfoo..."
 	@npx promptfoo@latest redteam run -c redteam/promptfoo.yaml
+
+update-locks:
+	@python3 scanner/update_locks.py
