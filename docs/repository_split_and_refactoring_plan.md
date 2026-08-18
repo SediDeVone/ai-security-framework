@@ -53,6 +53,9 @@ ai-security-framework/
 │   └── settings.json         # Base permissions.deny and event wiring
 ├── scanner/                  # Standalone Security Microservice
 │   ├── scanner_service.py    # FastAPI service
+│   ├── update_locks.py       # Checksum utility
+│   ├── scanner.service       # systemd unit
+│   ├── com.aisecurity.scanner.plist # launchd agent
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── docker-compose.yml
@@ -100,20 +103,8 @@ ai-security-framework/
 
 ---
 
-## 3. Remaining Roadmap & Next Steps
+## 3. Implementation Status
 
-```mermaid
-gantt
-    title Refactoring Execution Roadmap
-    dateFormat  YYYY-MM-DD
-    section Decoupled Deployments
-    Test standalone Docker build on Synology       :p3, 2026-07-21, 2d
-    Add configurable SCANNER_URL in guard.py      :done, p4, 2026-07-23, 1d
-    section Physical Split (Optional)
-    Split into 2 repos if multi-client adoption grows :p5, 2026-07-25, 3d
-```
-
-### Current Status:
 The repository has been successfully reorganized according to **Strategy A (Monorepo with `harness/` and `scanner/` subdirectories)**. This provides architectural clarity while keeping maintenance simple. If the standalone scanner is adopted by other teams or projects later, execute **Strategy B** to extract `scanner/` into its own repository.
 
 ---

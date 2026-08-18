@@ -1,6 +1,6 @@
 # Security Assessment & Standalone Agent Security Plan
 
-This document evaluates the existing security harness for **Claude Code** and provides a roadmap for enhancing it. It also outlines architecture patterns and tool integration strategies for protecting **standalone agents**.
+This document evaluates the security harness for **Claude Code** and details the implemented security architecture. It also outlines architecture patterns and tool integration strategies for protecting **standalone agents**.
 
 ---
 
@@ -37,11 +37,14 @@ graph TD
 5. **MCP Server Sandboxing**: Hook dispatcher supports an `ALLOWED_MCP_SERVERS` allowlist to block unvetted MCP servers.
 6. **Automated Rule Feeds**: Included `update_rules.sh` script automates pulling latest NOVA threat patterns.
 7. **Configurable Connectivity**: The scanner URL is configurable via environment variables, allowing for remote or containerized scanner deployments.
-8. **Asymmetric Fail-Safes**:
+8. **Sandboxed Tool Execution**: Integrated `Sandbox` interface supporting local Docker and remote E2B for secure code execution.
+9. **Advanced Output Sanitization**: Automated HTML stripping, EXIF metadata removal from images, and invisible Unicode (homoglyph) cleaning.
+10. **Agent Budgeting & Guardrails**: Session-based token and cost tracking to prevent "Denial of Wallet" attacks.
+11. **Asymmetric Fail-Safes**:
    - *Fail-open* on `UserPromptSubmit` to prevent blocking the developer session if the scanner crashes.
    - *Fail-closed* on `PreToolUse` for outbound tool calls (`mcp__` and `Bash`), minimizing data egress risk.
-9. **Multi-Engine Strategy**: Combines pattern-matching (NOVA), heuristics (LLM Guard), ML classification (PromptGuard 2), and PII anonymization (Presidio).
-10. **Out-of-Band Hard Hardening**: Uses Claude Code’s native `permissions.deny` blocklist to restrict critical commands (e.g. piping curl to bash, accessing SSH/AWS directories), which is non-bypassable by hooks.
+12. **Multi-Engine Strategy**: Combines pattern-matching (NOVA), heuristics (LLM Guard), ML classification (PromptGuard 2), and PII anonymization (Presidio).
+13. **Out-of-Band Hard Hardening**: Uses Claude Code’s native `permissions.deny` blocklist to restrict critical commands (e.g. piping curl to bash, accessing SSH/AWS directories), which is non-bypassable by hooks.
 
 ### Identified Gaps & Recommendations
 
@@ -52,14 +55,17 @@ graph TD
 
 ---
 
-## 2. Enhancing the Claude Code Harness: Proposed Additions
+## 2. Security Capabilities & Implementation Status
 
-Here is a concrete plan to augment the current harness:
+The following features have been integrated into the harness:
 
-| Target Component | Proposed Security Feature | Rationale |
+| Target Component | Security Feature | Status |
 | :--- | :--- | :--- |
-| **Observability** | SIEM Integration | Export structured JSON logs to external logging providers (e.g. Datadog, Splunk) for real-time alerting. |
-| **MCP Hardening** | MCP Server Permissions Sandboxing (Extended) | Implement granular per-tool permissioning within authorized MCP servers. |
+| **Observability** | SIEM Integration | **Implemented**: Structured JSON logs are exported to `~/.claude/security_audit.jsonl`. |
+| **MCP Hardening** | MCP Server Sandboxing | **Implemented**: Allowlist-based filtering for `mcp__` tools in `guard.py`. |
+| **API Security** | Endpoint Protection | **Implemented**: Middleware checking `X-API-Key` headers when `SCANNER_API_KEY` is configured. |
+| **Tamper Auditing** | Skill & Instruction Integrity check | **Implemented**: SHA256 verification of instructions against `~/.claude/skill_locks.json` at SessionStart. |
+| **Process Daemon** | Daemon Autostart Support | **Implemented**: systemd service unit and macOS launchd plist templates in `scanner/`. |
 
 ---
 
@@ -141,19 +147,3 @@ For standalone agents, you should combine the following frameworks depending on 
 * **Role**: Multi-class safety classification.
 * **Standalone Usage**: Fast, self-hosted safety classification (Llama Guard 3 is highly capable for safety category checks, while Prompt Guard is highly optimized for jailbreak classification).
 
----
-
-## 5. Remaining Implementation Tasks
-
-```mermaid
-gantt
-    title Agent Security Implementation Roadmap
-    dateFormat  YYYY-MM-DD
-    section Claude Code Enhancements
-    NOVA feed auto-updater         :done, a3, 2026-07-18, 1d
-    Structured Hook Auditing       :done, a4, 2026-07-18, 1d
-    MCP Server Sandboxing          :done, a5, 2026-07-18, 1d
-    section Standalone Gateway
-    Presidio Rehydration Middleware:done, b2, 2026-07-23, 2d
-    Sandboxed Tool Execution (E2B) :b3, after b2, 3d
-```

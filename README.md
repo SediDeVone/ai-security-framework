@@ -33,6 +33,7 @@ Using `make`:
 make install-harness  # Installs hooks, commands, agents, & rules into ~/.claude/
 make docker-up        # Starts containerized scanner service
 make test             # Sanity & health check endpoints
+make update-locks     # Computes and locks SHA256 hashes of instruction files
 ```
 
 Manual install:
@@ -69,6 +70,8 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 - `scanner/budget_guard.py` — Token quota, step limit, & budget cap manager against Denial of Wallet
 - `scanner/client.py` — Python SDK client for consuming the scanner in standalone agents
 - `scanner/scanner_service.py` — FastAPI service: Presidio + NOVA + PromptGuard 2
+- `scanner/scanner.service` — systemd unit template for persistent background execution on Linux
+- `scanner/com.aisecurity.scanner.plist` — launchd configuration template for macOS autostart
 - `scanner/Dockerfile` & `scanner/docker-compose.yml` — Docker container deployment
 - `rules/` — Threat intelligence NOVA rules (.nov)
 - `docs/ADK_HARNESS_SECURITY_GUIDE.md` — Dual security guide for CLI harnesses & custom ADK/SDK agents
