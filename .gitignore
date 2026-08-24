@@ -32,3 +32,8 @@ Thumbs.db
 *.log
 /tmp/
 tmp/
+
+# Secrets and credentials
+.aws/
+.ssh/
+secrets/
