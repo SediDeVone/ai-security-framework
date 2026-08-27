@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   scanner:
-    build: .
+    build:
+      context: ..
+      dockerfile: scanner/Dockerfile
     image: ai-security-scanner:latest
     container_name: ai-security-scanner
     ports:
@@ -15,10 +17,28 @@ services:
       # Provide HF token if downloading license-gated models, or mount the cache below
       - HF_TOKEN=
     volumes:
-      # Mount rules directory so the service can read and reload them
-      - ./rules:/root/.claude/nova-rules
+      # Mount rules directory so the service can read and reload them (pointing to scanneruser home)
+      - ./rules:/home/scanneruser/.claude/nova-rules
       # Mount cache directory so models are not redownloaded on container restart
-      - hf_cache:/root/.cache/huggingface
+      - hf_cache:/home/scanneruser/.cache/huggingface
+      # Mount host Docker socket to enable sibling container sandboxing
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8901/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
 
 volumes:
   hf_cache:

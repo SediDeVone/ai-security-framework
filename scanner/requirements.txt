@@ -8,6 +8,8 @@ spacy
 transformers
 torch
 Pillow
+nh3
+
 # optional, for AlignmentCheck (/scan/trace); needs LLM backend key:
 # llamafirewall
 # after install:

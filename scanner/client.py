@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional
 class SecurityScannerClient:
     def __init__(self, endpoint: Optional[str] = None, api_key: Optional[str] = None):
         self.endpoint = (endpoint or os.environ.get("SCANNER_URL", "http://127.0.0.1:8901")).rstrip("/")
-        self.api_key = api_key
+        self.api_key = api_key or os.environ.get("SCANNER_API_KEY")
+
 
     def _post(self, path: str, payload: dict, timeout: int = 5) -> dict:
         headers = {"Content-Type": "application/json"}

@@ -10,18 +10,17 @@ from typing import Dict, Any, List
 
 
 def sanitize_html(text: str) -> str:
-    """Escapes raw HTML tags and strips dangerous script/img event attributes."""
+    """Sanitizes HTML tags and attributes using parser-based nh3 (fallback to html.escape)."""
     if not text:
         return text
         
-    # Remove script and iframe tags completely
-    clean_text = re.sub(r"(?i)<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>", "", text)
-    clean_text = re.sub(r"(?i)<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>", "", clean_text)
-    
-    # Remove inline event handlers (onerror=, onload=, onclick=)
-    clean_text = re.sub(r"(?i)\s+on\w+\s*=\s*['\"][^'\"]*['\"]", "", clean_text)
-    
-    return clean_text
+    try:
+        import nh3
+        return nh3.clean(text)
+    except ImportError:
+        # Fallback to strict HTML escaping if nh3 is not available, avoiding fragile regex XSS bypasses
+        return html.escape(text)
+
 
 
 def validate_generated_url(url: str, allowed_domains: List[str] = None) -> bool:

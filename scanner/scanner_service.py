@@ -8,14 +8,25 @@ Endpoints consumed by hooks/guard.py:
   POST /scan/tool-output  {tool, text}          -> {block, rule, redacted_text}
 """
 import glob
+import hmac
 import json
+import logging
 import os
 import re
+
 from typing import Optional, List, Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+# Initialize logging for production observability
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("scanner_service")
+
 
 # --- engines (loaded once, warm) -------------------------------------------
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
@@ -73,7 +84,7 @@ try:
         model=os.environ.get("PROMPT_GUARD_MODEL",
                              "meta-llama/Llama-Prompt-Guard-2-22M"))
 except Exception as e:
-    print(f"[scanner] PromptGuard 2 unavailable, injection scoring off: {e}")
+    logger.warning(f"PromptGuard 2 unavailable, injection scoring off: {e}")
 
 # AlignmentCheck (LlamaFirewall) — optional trace auditor. Needs the
 # llamafirewall package and an LLM backend (e.g. TOGETHER_API_KEY).
@@ -83,7 +94,8 @@ try:
     alignment_fw = LlamaFirewall(
         scanners={Role.ASSISTANT: [ScannerType.AGENT_ALIGNMENT]})
 except Exception as e:
-    print(f"[scanner] AlignmentCheck unavailable: {e}")
+    logger.warning(f"AlignmentCheck unavailable: {e}")
+
 
 
 def injection_score(text: str) -> float:
@@ -126,8 +138,9 @@ def load_rules_if_needed():
                 for r in parser.parse_file(f):
                     new_matchers.append(NovaMatcher(r))
             except Exception as e:
-                print(f"[scanner] Error loading rule file {f}: {e}")
+                logger.error(f"Error loading rule file {f}: {e}")
         matchers = new_matchers
+
         last_rules_loaded = max_mtime
 
 PII_ENTITIES = ["EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD", "IBAN_CODE",
@@ -140,16 +153,31 @@ app = FastAPI()
 
 SCANNER_API_KEY = os.environ.get("SCANNER_API_KEY")
 
+@app.on_event("startup")
+async def startup_event():
+    if not SCANNER_API_KEY:
+        logger.warning(
+            "⚠️ SCANNER_API_KEY environment variable is NOT set! "
+            "The service will run in OPEN mode, and endpoints "
+            "(including /sandbox/execute) will be unauthenticated!"
+        )
+    else:
+        logger.info("SCANNER_API_KEY is configured. Request authentication is enabled.")
+
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
     if SCANNER_API_KEY and request.url.path not in ("/health", "/docs", "/openapi.json"):
         api_key = request.headers.get("X-API-Key")
-        if api_key != SCANNER_API_KEY:
+        if not api_key or not hmac.compare_digest(api_key, SCANNER_API_KEY):
+            logger.warning(
+                f"Unauthorized request to {request.url.path} from {request.client.host if request.client else 'unknown'}"
+            )
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Unauthorized: Invalid or missing X-API-Key"}
             )
     return await call_next(request)
+
 
 
 class PromptReq(BaseModel):
@@ -190,15 +218,52 @@ def redact_pii(text: str) -> tuple[str, bool, dict]:
     if not findings:
         return text, False, {}
     
-    res = anonymizer.anonymize(text=text, analyzer_results=findings)
-    # Build rehydration map
-    remap = {}
-    for item in res.items:
-        token = res.text[item.start:item.end]
-        original = text[item.text_start:item.text_end]
-        remap[token] = original
+    # Sort findings by start position, then end position descending to process
+    # overlapping findings consistently (keeping the longer and higher scoring one).
+    sorted_findings = sorted(findings, key=lambda x: (x.start, -x.end))
+    
+    filtered_findings = []
+    last_end = -1
+    for f in sorted_findings:
+        if f.start >= last_end:
+            filtered_findings.append(f)
+            last_end = f.end
+        else:
+            # Overlap! Keep the higher scoring or longer finding
+            if filtered_findings:
+                prev = filtered_findings[-1]
+                if f.score > prev.score or (f.score == prev.score and (f.end - f.start) > (prev.end - prev.start)):
+                    filtered_findings[-1] = f
+                    last_end = f.end
+
+    # Process findings in reverse order (from last to first) to prevent index shifting
+    reverse_findings = sorted(filtered_findings, key=lambda x: x.start, reverse=True)
+    
+    entity_counts = {}
+    value_to_placeholder = {}
+    placeholder_to_value = {}
+    
+    current_text = text
+    for finding in reverse_findings:
+        start = finding.start
+        end = finding.end
+        entity_type = finding.entity_type
+        original_val = text[start:end]
         
-    return res.text, True, remap
+        # Consistent mapping: same original value gets the same placeholder
+        if original_val in value_to_placeholder:
+            placeholder = value_to_placeholder[original_val]
+        else:
+            count = entity_counts.get(entity_type, 0) + 1
+            entity_counts[entity_type] = count
+            placeholder = f"<{entity_type}_{count}>"
+            value_to_placeholder[original_val] = placeholder
+            placeholder_to_value[placeholder] = original_val
+            
+        current_text = current_text[:start] + placeholder + current_text[end:]
+        
+    return current_text, True, placeholder_to_value
+
 
 
 @app.post("/scan/prompt")

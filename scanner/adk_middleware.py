@@ -37,9 +37,12 @@ class SecureAgentMiddleware:
     def rehydrate(self, text: str) -> str:
         """Replaces PII tokens with original values."""
         rehydrated = text
-        for token, original in self.rehydration_map.items():
-            rehydrated = rehydrated.replace(token, original)
+        # Sort tokens by length in descending order to avoid partial replacement of nested tokens (e.g., <PERSON_10> before <PERSON_1>)
+        sorted_tokens = sorted(self.rehydration_map.keys(), key=len, reverse=True)
+        for token in sorted_tokens:
+            rehydrated = rehydrated.replace(token, self.rehydration_map[token])
         return rehydrated
+
 
     def wrap_tool_execution(self, tool_name: str, tool_args: dict, is_egress: bool = False) -> Tuple[dict, Optional[str]]:
         """Intercepts tool calls in custom agent loops before execution."""

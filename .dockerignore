@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+.venv
+venv/
+.vscode/
+.idea/
+*.log
+harness/hooks/__pycache__/
+scanner/__pycache__/
