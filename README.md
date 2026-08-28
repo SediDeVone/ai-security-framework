@@ -114,3 +114,8 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 - `InstructionsLoaded` hook — audit log of every skill/CLAUDE.md load
   (observability only, can't block).
 - Sandbox/devcontainer for `--dangerously-skip-permissions` runs.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](file:///Users/sebastianlasisz/workspace/repositories/ai_tools/ai-security-framework/LICENSE) file for details.
+
