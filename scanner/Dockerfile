@@ -38,5 +38,9 @@ USER scanneruser
 # Expose the service
 EXPOSE 8901
 
-CMD ["python", "scanner/scanner_service.py"]
+# Set python path to allow imports of scanner package
+ENV PYTHONPATH=/app
+
+CMD ["python", "-m", "scanner.scanner_service"]
+
 

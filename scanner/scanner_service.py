@@ -476,4 +476,7 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8901)
+    host = os.environ.get("SCANNER_HOST", "0.0.0.0")
+    port = int(os.environ.get("SCANNER_PORT", 8901))
+    uvicorn.run(app, host=host, port=port)
+
