@@ -13,6 +13,15 @@ import json
 import logging
 import os
 import re
+import sys
+from pathlib import Path
+
+# Ensure repository root and script directory are in sys.path for direct execution
+_current_dir = Path(__file__).resolve().parent
+_repo_root = _current_dir.parent
+for _p in [str(_repo_root), str(_current_dir)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from typing import Optional, List, Dict, Any
 
@@ -35,12 +44,20 @@ from llm_guard.input_scanners import Secrets, InvisibleText
 from nova.core import NovaRuleFileParser, NovaMatcher  # nova-hunting
 
 # --- custom security modules -----------------------------------------------
-from scanner.exif_cleaner import strip_exif_from_bytes
-from scanner.unicode_cleaner import sanitize_unicode
-from scanner.output_sanitizer import sanitize_html, validate_generated_url
-from scanner.budget_guard import AgentBudgetGuard, BudgetExceededException
-from scanner.spotlighting import wrap_delimited
-from scanner.sandbox import get_sandbox
+try:
+    from scanner.exif_cleaner import strip_exif_from_bytes
+    from scanner.unicode_cleaner import sanitize_unicode
+    from scanner.output_sanitizer import sanitize_html, validate_generated_url
+    from scanner.budget_guard import AgentBudgetGuard, BudgetExceededException
+    from scanner.spotlighting import wrap_delimited
+    from scanner.sandbox import get_sandbox
+except ModuleNotFoundError:
+    from exif_cleaner import strip_exif_from_bytes
+    from unicode_cleaner import sanitize_unicode
+    from output_sanitizer import sanitize_html, validate_generated_url
+    from budget_guard import AgentBudgetGuard, BudgetExceededException
+    from spotlighting import wrap_delimited
+    from sandbox import get_sandbox
 
 # Custom Polish Recognizers for regional PII compliance
 pesel_pattern = Pattern(
@@ -381,18 +398,21 @@ def scan_tool_output(req: ToolOutputReq):
     if rule:
         return {"block": True, "rule": rule}
     # PromptGuard 2 gates fetched/external content harder than user prompts
-    if injection_score(text) > 0.8:
+    if req.tool in ("WebFetch", "WebSearch") and injection_score(text) > 0.8:
         return {"block": True, "rule": "promptguard2:injection"}
     
     # Redact PII
     red, hit, _ = redact_pii(text)
+    if hit:
+        text = red
+        modified = True
     
-    # HTML Sanitization if text looks like HTML
-    if "<" in text and ">" in text:
+    # HTML Sanitization for web fetch tools only (preserve code files on Read)
+    if req.tool in ("WebFetch", "WebSearch") and ("<" in text and ">" in text):
         text = sanitize_html(text)
         modified = True
 
-    return {"block": False, "redacted_text": red if (hit or modified) else None}
+    return {"block": False, "redacted_text": text if modified else None}
 
 
 @app.post("/scan/budget/record")

@@ -22,8 +22,10 @@ install-harness:
 update-rules:
 	@./scanner/update_rules.sh --force
 
+PYTHON ?= $(shell [ -f $(HOME)/.claude/scanner-venv/bin/python3 ] && echo $(HOME)/.claude/scanner-venv/bin/python3 || ([ -f .venv/bin/python3 ] && echo .venv/bin/python3 || echo python3))
+
 start-scanner:
-	python3 scanner/scanner_service.py
+	PYTHONPATH=. $(PYTHON) scanner/scanner_service.py
 
 docker-up:
 	docker-compose -f scanner/docker-compose.yml up -d --build
@@ -50,4 +52,4 @@ redteam:
 	@npx promptfoo@latest redteam run -c redteam/promptfoo.yaml
 
 update-locks:
-	@python3 scanner/update_locks.py
+	@$(PYTHON) scanner/update_locks.py

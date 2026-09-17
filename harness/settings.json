@@ -38,7 +38,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "WebFetch|WebSearch|mcp__.*",
+        "matcher": "Read|WebFetch|WebSearch|mcp__.*",
         "hooks": [
           {
             "type": "command",
