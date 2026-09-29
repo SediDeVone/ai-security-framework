@@ -27,6 +27,15 @@ graph TD
     Transcript[Session Stop] -->|Stop| Guard
     Guard -->|POST /scan/trace| Service
     Service --> LlamaFW[AlignmentCheck LlamaFirewall]
+
+    subgraph Agent Skills Layer [In-Context Agent Cognitive Defenses]
+        direction TB
+        Skills[Agent Skills Framework]
+        Skills --> CT[content-triage: Unicode & Injection Unmasking]
+        Skills --> DV[dependency-verification: Slopsquatting Defense]
+        Skills --> SA[skill-audit: MCP & Skill Supply Chain]
+        Skills --> RT[resilience-test: Canary Red-Teaming & OWASP Mapping]
+    end
 ```
 
 ### Key Strengths of Current Design

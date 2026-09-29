@@ -11,14 +11,16 @@ This document maps the repository architecture directly to the **6 Pillars of Se
 │                               THE 6 PILLARS OF AI SECURITY                             │
 ├───────────────────┬───────────────────┬───────────────────┬────────────────────────────┤
 │ 1. AI Architecture│ 2. Injection      │ 3. Data & Secrets │ 4. Secure RAG              │
-│    - Dual LLM     │    - Spotlighting │    - Presidio PII  │    - Pre-retrieval Filter │
+│    - Dual LLM     │    - Spotlighting │    - Presidio PII │    - Pre-retrieval Filter  │
 │    - CaMeL        │    - PromptGuard  │    - Custom PESEL │    - Vector RBAC           │
 │    - Sandboxing   │    - HiTL         │    - Secrets Vault│    - Anomaly Detection     │
+│    - Agent Skills │    - ContentTriage│    - Slopsquatting│                            │
 ├───────────────────┴───────────────────┴───────────────────┴────────────────────────────┤
 │ 5. Agent & MCP Security                   6. Monitoring, Detection & IR                │
 │    - OAuth 2.1 + PKCE                      - Pre-deploy Red-Teaming (garak/promptfoo)  │
 │    - Tool Scope & Per-call Auth            - Kill Switch Endpoint                      │
-│    - Audit Logging                         - MITRE ATLAS / OWASP / NIST Mapping       │
+│    - Skill & MCP Audit (skill-audit)       - Canary Resilience Testing (resilience-test)│
+│    - Audit Logging                         - MITRE ATLAS / OWASP / NIST Mapping        │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -44,6 +46,7 @@ This document maps the repository architecture directly to the **6 Pillars of Se
   3. **Source Validation**: Treat RAG, web, email, and calendar content as permanently untrusted.
   4. **Human-in-the-Loop (HiTL)**: Mandate explicit human confirmation for destructive/non-reversible actions (file deletion, payment, config change). `harness/hooks/guard.py` enforces `permissionDecision: "ask"` on outbound MCP/Bash calls.
   5. **Output Scanning**: Redact PII, secrets, XSS, and malicious URLs before rendering results.
+  6. **Cognitive Triage**: In-context untrusted content triage (`skills/content-triage/SKILL.md`) unmasking ASCII smuggling (`0xE0000`), bidi overrides, zero-width characters, and HTML comments before processing.
 
 ---
 
@@ -54,6 +57,7 @@ This document maps the repository architecture directly to the **6 Pillars of Se
   - **Regional Compliance**: Pre-configured custom recognizers for Polish **PESEL** (11-digit national ID) and **NIP** (tax identification number).
   - **Anonymization Strategies**: Supported modes: `replace` (`<PERSON>`), `hash` (SHA-256), `encrypt`, and `fake`.
   - **Zero Data Retention (ZDR)**: Guidelines for using enterprise ZDR endpoints to avoid 30-day provider logging.
+  - **Slopsquatting & Dependency Verification**: `skills/dependency-verification/SKILL.md` auditing PyPI and npm registries to stop hallucinated packages before installation.
 
 ---
 
@@ -69,6 +73,7 @@ This document maps the repository architecture directly to the **6 Pillars of Se
 * **OAuth 2.1 + PKCE**: Standard authorization for remote MCP servers with Resource Indicators (RFC 8707).
 * **Tool-Level Scopes**: Grants per tool (e.g. `read` scope does not grant `delete`).
 * **Supply Chain Scans**: Daily automated `mcp-scan` and `sketchy` checks on MCP servers and skillpacks (`harness/hooks/supply_chain_check.sh`).
+* **Pre-Install Skill Audits**: In-depth inspection via `skills/skill-audit/SKILL.md` checking 3rd-party skills and MCP tools for instruction hijacking, covert exfiltration, and out-of-bounds symlinks before deployment.
 * **Emergency Kill Switch**: Instant agent cut-off endpoint (`/kill-switch`) in `scanner/scanner_service.py`.
 
 ---
@@ -76,6 +81,7 @@ This document maps the repository architecture directly to the **6 Pillars of Se
 ## Pillar 6: Monitoring, Detection & Response (IR)
 * **Principle**: *Continuous security lifecycle: Red-team $\rightarrow$ Guard $\rightarrow$ Detect $\rightarrow$ Respond.*
 * **Pre-Deploy Red-Teaming**: Automated evaluation with `garak` and `promptfoo` (`redteam/promptfoo.yaml`).
+* **Canary Resilience Probes**: `skills/resilience-test/SKILL.md` and `references/techniques.md` providing systematic canary testing (K1–K3) across attack categories A–F mapped directly to OWASP GenAI Top 10 and Agentic Security Initiative (ASI).
 * **Runtime Guardrails**: FastAPI scanner microservice exposing `/scan/prompt`, `/scan/tool-input`, `/scan/tool-output`, `/scan/trace`.
 * **Incident Response (IR)**:
   - Anomaly billing detection (LLM Jacking mitigation).

@@ -11,11 +11,12 @@ help:
 	@echo "  make update-locks     - Compute and lock SHA256 hashes of instruction files"
 
 install-harness:
-	@mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents
+	@mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents ~/.claude/skills
 	@cp harness/hooks/*.py harness/hooks/*.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/*
 	@cp rules/*.nov ~/.claude/nova-rules/
 	@cp harness/commands/strip-pii.md ~/.claude/commands/
 	@cp harness/agents/untrusted-reader.md ~/.claude/agents/
+	@cp -r skills/* ~/.claude/skills/
 	@chmod +x scanner/update_rules.sh
 	@echo "Harness installed! Remember to merge harness/settings.json into ~/.claude/settings.json."
 

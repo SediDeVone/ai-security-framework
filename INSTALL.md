@@ -22,11 +22,12 @@ Confirm before starting:
 From this folder:
 
 ```bash
-mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents
+mkdir -p ~/.claude/hooks ~/.claude/nova-rules ~/.claude/commands ~/.claude/agents ~/.claude/skills
 cp harness/hooks/*.py harness/hooks/*.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/*
 cp rules/*.nov ~/.claude/nova-rules/
 cp harness/commands/strip-pii.md ~/.claude/commands/
 cp harness/agents/untrusted-reader.md ~/.claude/agents/
+cp -r skills/* ~/.claude/skills/
 ```
 
 ## Step 2 — MERGE settings.json (never overwrite)

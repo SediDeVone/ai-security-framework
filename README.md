@@ -7,10 +7,12 @@ multi-second model cold start per hook call) + **one thin hook dispatcher**.
 ## Architecture
 
 ```
-prompt ──► UserPromptSubmit ─► guard.py ─► scanner service :8901 ─► NOVA + LLM Guard (block only)
-tool in ─► PreToolUse ───────► guard.py ─► Presidio redact ─► updatedInput (rewrite)
-tool out ► PostToolUse ──────► guard.py ─► NOVA on fetched content ─► block/flag
-supply  ─► SessionStart ─────► agent-scan (mcp-scan) + sketchy (async, cached daily)
+prompt   ──► UserPromptSubmit ─► guard.py ─► scanner service :8901 ─► NOVA + LLM Guard (block only)
+tool in  ──► PreToolUse ───────► guard.py ─► Presidio redact ─► updatedInput (rewrite)
+tool out ──► PostToolUse ──────► guard.py ─► NOVA on fetched content ─► block/flag
+supply   ──► SessionStart ─────► agent-scan (mcp-scan) + sketchy (async, cached daily)
+skills   ──► Agent Reasoning ──► skills/ (content-triage, dependency-verification, skill-audit)
+redteam  ──► Pre-deploy Test ──► skills/resilience-test + promptfoo (OWASP / Canary validation)
 ```
 
 ## Layers
@@ -24,6 +26,8 @@ supply  ─► SessionStart ─────► agent-scan (mcp-scan) + sketchy (
 | MCP supply chain | Snyk agent-scan (ex mcp-scan, Invariant) | `SessionStart` + CI | tool poisoning, shadowing, rug pulls; also scans **skills** |
 | Config tampering | sketchy (Adversis) | git post-checkout / CI | scans settings.json, CLAUDE.md, hook defs |
 | Hard limits | Claude Code permissions | `permissions.deny` + managed settings | not bypassable by hooks |
+| Cognitive agent defense | `content-triage`, `dependency-verification`, `skill-audit` | In-context Agent Skills | data framing, ASCII smuggling unmasking, PyPI verification, skill audits |
+| Resilience & red-teaming | `resilience-test` + promptfoo / garak | Pre-deploy verification & regression | canary probes (K1–K3) mapped to OWASP LLM Top 10 & Agentic (ASI) |
 
 ## Install & Shortcuts
 
@@ -66,6 +70,7 @@ cp harness/agents/untrusted-reader.md ~/.claude/agents/
 - `harness/commands/strip-pii.md` — copy to `~/.claude/commands/`
 - `harness/agents/untrusted-reader.md` — copy to `~/.claude/agents/`
 - `harness/hooks/skill_integrity_check.py` — SHA256 instruction & skill file integrity checker
+- `skills/` — Security agent skills in open Agent Skills format (`skill-audit`, `content-triage`, `dependency-verification`, `resilience-test`)
 - `scanner/adk_middleware.py` — Universal ADK/SDK security interceptor for custom Python agents (Google Gen AI ADK, LangChain, CrewAI)
 - `scanner/budget_guard.py` — Token quota, step limit, & budget cap manager against Denial of Wallet
 - `scanner/client.py` — Python SDK client for consuming the scanner in standalone agents
